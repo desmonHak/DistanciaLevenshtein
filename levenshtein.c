@@ -5,51 +5,89 @@
 #define Min(x,y) ((x)<(y) ? (x) : (y))
 #define Min3(x,y,z) Min(Min((x),(y)),(z))
 
-int Levenshtein(const char *s1, const char *s2) {
-    size_t t1 = strlen(s1), t2 = strlen(s2);
-    if (t1 == 0) return t2;
-    if (t2 == 0) return t1;
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 
-    // Usamos arreglos dinámicos para dos filas
-    int *prev = malloc((t1+1) * sizeof(int));
-    int *curr = malloc((t1+1) * sizeof(int));
+// Función para calcular la distancia de Levenshtein entre dos cadenas
+int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
+    size_t len1 = strlen(str1);
+    size_t len2 = strlen(str2);
 
-    for (size_t i=0; i<=t1; ++i) prev[i] = i;
+    // Casos base para cadenas vacías
+    if (len1 == 0) return len2;
+    if (len2 == 0) return len1;
 
-    for (size_t j=1; j<=t2; ++j) {
-        curr[0] = j;
-        for (size_t i=1; i<=t1; ++i) {
-            /*
-            // si no queremos hacer distincion entre masyusculas y minusculas
-            int costo = (tolower(s1[i-1]) != tolower(s2[j-1]));
-            */
-            int costo = (tolower(s1[i-1]) != tolower(s2[j-1]));
-
-
-            /*
-            // si queremos hacer distincion entre mayusculas y minusculas:
-            if (s1[i-1] == s2[j-1]) {
-                costo = 0; // Los caracteres son iguales
-            } else {
-                costo = 1; // Los caracteres son diferentes
-            }
-            */
-            curr[i] = Min3(
-                prev[i] + 1,      // Inserción
-                curr[i-1] + 1,    // Eliminación
-                prev[i-1] + costo // Sustitución
-            );
-        }
-        // Swap pointers
-        int *temp = prev;
-        prev = curr;
-        curr = temp;
+    // Optimización: usar siempre la cadena más corta como fila
+    if (len1 > len2) {
+        const char *temp = str1;
+        str1 = str2;
+        str2 = temp;
+        size_t tempLen = len1;
+        len1 = len2;
+        len2 = tempLen;
     }
 
-    int res = prev[t1];
-    free(prev); free(curr);
-    return res;
+    // Si no se tiene en cuenta las mayúsculas/minúsculas, convertir las cadenas a minúsculas
+    const char *processedStr1 = str1;
+    const char *processedStr2 = str2;
+
+    if (!caseSensitive) {
+        char *lowerStr1 = (char *)malloc(len1 + 1);
+        char *lowerStr2 = (char *)malloc(len2 + 1);
+
+        for (size_t i = 0; i < len1; ++i) lowerStr1[i] = tolower(str1[i]);
+        lowerStr1[len1] = '\0';
+        for (size_t i = 0; i < len2; ++i) lowerStr2[i] = tolower(str2[i]);
+        lowerStr2[len2] = '\0';
+
+        processedStr1 = lowerStr1;
+        processedStr2 = lowerStr2;
+    }
+
+    // Usamos un solo array para almacenar los costos actuales y anteriores
+    int *currentRow = (int *)malloc((len1 + 1) * sizeof(int));
+
+    // Inicializamos la primera fila (costos para transformar una cadena vacía)
+    for (size_t i = 0; i <= len1; ++i) {
+        currentRow[i] = i;
+    }
+
+    // Iteramos sobre cada carácter de la cadena objetivo
+    for (size_t j = 1; j <= len2; ++j) {
+        int previousDiagonal = currentRow[0]; // Costo diagonal anterior
+        currentRow[0] = j;                    // Costo inicial para esta fila
+
+        // Iteramos sobre cada carácter de la cadena fuente
+        for (size_t i = 1; i <= len1; ++i) {
+            int substitutionCost =
+                previousDiagonal + (processedStr1[i - 1] != processedStr2[j - 1]);
+            int insertionCost = currentRow[i - 1] + 1;
+            int deletionCost = currentRow[i] + 1;
+
+            // Calculamos el costo mínimo entre las tres operaciones posibles
+            previousDiagonal = currentRow[i];
+            currentRow[i] =
+                substitutionCost < insertionCost ? substitutionCost : insertionCost;
+            currentRow[i] =
+                currentRow[i] < deletionCost ? currentRow[i] : deletionCost;
+        }
+    }
+
+    // El último valor en el array representa la distancia de Levenshtein
+    int result = currentRow[len1];
+
+    // Liberamos memoria dinámica utilizada
+    free(currentRow);
+    if (!caseSensitive) {
+        free((char *)processedStr1);
+        free((char *)processedStr2);
+    }
+
+    return result;
 }
+
+
 
 
 float getAfinidad(
@@ -74,7 +112,7 @@ void CallArr(
 
         // obtener los datos del puntero data_s2 como el usuario quiera
         const char *s2 = get_s2(element);
-        int distancia = Levenshtein(s1, s2);
+        int distancia = Levenshtein(s1, s2, 0);
         work_vals(
             distancia, getAfinidad(strlen(s1), strlen(s2), distancia),
             element
@@ -93,7 +131,7 @@ int main() {
     const char *s1 = "identificar";
     const char *s2 = "identify";
     
-    int distancia = Levenshtein(s1, s2);
+    int distancia = Levenshtein(s1, s2, 1);
     float afinidad = getAfinidad(strlen(s1), strlen(s2), distancia);
     
     printf("Distancia: %d\nAfinidad: %.4f%%\n", 
@@ -103,23 +141,19 @@ int main() {
 
     Example_struct_complex_data data[] = {
         {
-            .string = "Hola",
+            .string = "user",
             .afinidad = 0
         },
         {
-            .string = "Hello",
+            .string = "users",
             .afinidad = 0
         },
         {
-            .string = "Juan",
+            .string = "usuarios",
             .afinidad = 0
         },
         {
-            .string = "hol",
-            .afinidad = 0
-        },
-        {
-            .string = "hollllllaaaaaaaaa",
+            .string = "Usuariozs",
             .afinidad = 0
         }
     };
@@ -140,7 +174,7 @@ int main() {
         );
     }
     CallArr(
-        "hola", 
+        "usuario", 
         get_string, 
         &data, get_next_element_arr, 
         sizeof(data)/sizeof(Example_struct_complex_data),
