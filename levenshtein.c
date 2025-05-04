@@ -2,6 +2,10 @@
 #define Min(x,y) ((x)<(y) ? (x) : (y))
 #define Min3(x,y,z) Min(Min((x),(y)),(z))
 
+// descomentar este define para mostrar las operaciones realizadas en la 
+// busqueda de palabras.
+//#define MOSTRAR_OPERACIONES
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -198,11 +202,13 @@ int main() {
         Example_struct_complex_data* data = (Example_struct_complex_data*)element;
         data->afinidad = afinidad;
 
-        //printf("Distancia: %d, Afinidad: %.4f%%. %s\n", 
-        //    distancia, 
-        //    data->afinidad * 100,
-        //    data->string
-        //);
+        #ifdef MOSTRAR_OPERACIONES
+        printf("Distancia: %d, Afinidad: %.4f%%. %s\n", 
+            distancia, 
+            data->afinidad * 100,
+            data->string
+        );
+        #endif
     }
     
     // Variables para almacenar los contadores de inicio y fin
@@ -222,6 +228,7 @@ int main() {
     );
     // Obtener el contador final
     QueryPerformanceCounter(&end);
+
 
     // Calcular el tiempo transcurrido en segundos
     double elapsedTimeSeconds = (double)(end.QuadPart - start.QuadPart) / frequency.QuadPart;
