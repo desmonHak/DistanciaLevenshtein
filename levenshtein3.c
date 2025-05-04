@@ -1,22 +1,21 @@
 #include <windows.h>
-#define Min(x,y) ((x)<(y) ? (x) : (y))
-#define Min3(x,y,z) Min(Min((x),(y)),(z))
-
-#include <ctype.h>
+#include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <ctype.h>
+
+#define Min(x, y) ((x) < (y) ? (x) : (y))
+#define Min3(x, y, z) Min(Min((x), (y)), (z))
 
 // Función para calcular la distancia de Levenshtein entre dos cadenas
 int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
     size_t len1 = strlen(str1);
     size_t len2 = strlen(str2);
 
-    // Casos base para cadenas vacías
     if (len1 == 0) return len2;
     if (len2 == 0) return len1;
 
-    // Optimización: usar siempre la cadena más corta como fila
     if (len1 > len2) {
         const char *temp = str1;
         str1 = str2;
@@ -26,7 +25,6 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
         len2 = tempLen;
     }
 
-    // Si no se tiene en cuenta las mayúsculas/minúsculas, convertir las cadenas a minúsculas
     const char *processedStr1 = str1;
     const char *processedStr2 = str2;
 
@@ -43,27 +41,21 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
         processedStr2 = lowerStr2;
     }
 
-    // Usamos un solo array para almacenar los costos actuales y anteriores
     int *currentRow = (int *)malloc((len1 + 1) * sizeof(int));
-
-    // Inicializamos la primera fila (costos para transformar una cadena vacía)
     for (size_t i = 0; i <= len1; ++i) {
         currentRow[i] = i;
     }
 
-    // Iteramos sobre cada carácter de la cadena objetivo
     for (size_t j = 1; j <= len2; ++j) {
-        int previousDiagonal = currentRow[0]; // Costo diagonal anterior
-        currentRow[0] = j;                    // Costo inicial para esta fila
+        int previousDiagonal = currentRow[0];
+        currentRow[0] = j;
 
-        // Iteramos sobre cada carácter de la cadena fuente
         for (size_t i = 1; i <= len1; ++i) {
             int substitutionCost =
                 previousDiagonal + (processedStr1[i - 1] != processedStr2[j - 1]);
             int insertionCost = currentRow[i - 1] + 1;
             int deletionCost = currentRow[i] + 1;
 
-            // Calculamos el costo mínimo entre las tres operaciones posibles
             previousDiagonal = currentRow[i];
             currentRow[i] =
                 substitutionCost < insertionCost ? substitutionCost : insertionCost;
@@ -72,10 +64,7 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
         }
     }
 
-    // El último valor en el array representa la distancia de Levenshtein
     int result = currentRow[len1];
-
-    // Liberamos memoria dinámica utilizada
     free(currentRow);
     if (!caseSensitive) {
         free((char *)processedStr1);
@@ -85,40 +74,78 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
     return result;
 }
 
-
-
-
-float getAfinidad(
-    size_t sizeof_str1,
-    size_t sizeof_str2, 
-    size_t distancia_Levenshtein
-) {
+float getAfinidad(size_t sizeof_str1, size_t sizeof_str2, size_t distancia_Levenshtein) {
     float longitud = sizeof_str1 > sizeof_str2 ? sizeof_str1 : sizeof_str2;
     return 1 - ((float)distancia_Levenshtein / longitud);
 }
 
-void CallArr(
-    const char* s1,                                 // palabra contra la que comprobar
-    const char* (*get_s2)(void*),                   // funcion para obtener el string de un array
-    void* data_s2_arr,                              // array con valores de cualquier tipo
-    void* (*get_next_element_arr)(void*, size_t i), // obtener el siguiente elemento del array
-    size_t size_elements_in_data_s2_arr,            // numero de elementos de un array
-    void (*work_vals)(int, float, void*)            // int distancia, float afinidad, void*element
-) {
-    for (int i = 0; i < size_elements_in_data_s2_arr; i++) {
-        void* element = get_next_element_arr(data_s2_arr, i);
+// Estructura para pasar datos a los hilos
+typedef struct ThreadData {
+    const char *s1;                                 // palabra contra la que comprobar
+    const char* (*get_s2)(void*);                   // función para obtener el string de un array
+    void* data_s2_arr;                              // array con valores de cualquier tipo
+    void* (*get_next_element_arr)(void*, size_t i); // función para obtener el siguiente elemento del array
+    size_t startIndex;                              // índice inicial para este hilo
+    size_t endIndex;                                // índice final para este hilo
+    void (*work_vals)(int, float, void*);           // función para procesar valores calculados
+} ThreadData;
 
-        // obtener los datos del puntero data_s2 como el usuario quiera
-        const char *s2 = get_s2(element);
-        int distancia = Levenshtein(s1, s2, 0);
-        work_vals(
-            distancia, getAfinidad(strlen(s1), strlen(s2), distancia),
-            element
-        );
-        
+// Función que ejecutará cada hilo
+void* threadFunction(void* arg) {
+    ThreadData* threadData = (ThreadData*)arg;
+
+    for (size_t i = threadData->startIndex; i < threadData->endIndex; ++i) {
+        void* element = threadData->get_next_element_arr(threadData->data_s2_arr, i);
+        const char *s2 = threadData->get_s2(element);
+
+        int distancia = Levenshtein(threadData->s1, s2, 0);
+        float afinidad =
+            getAfinidad(strlen(threadData->s1), strlen(s2), distancia);
+
+        threadData->work_vals(distancia, afinidad, element);
     }
 
+    return NULL;
 }
+
+// Función principal CallArr con soporte multihilo
+void CallArr(
+    const char* s1,
+    const char* (*get_s2)(void*),
+    void* data_s2_arr,
+    void* (*get_next_element_arr)(void*, size_t i),
+    size_t size_elements_in_data_s2_arr,
+    void (*work_vals)(int, float, void*)
+) {
+    int numThreads = 2; // Número de hilos a utilizar
+    pthread_t threads[numThreads];
+    ThreadData threadData[numThreads];
+
+    size_t elementsPerThread =
+        size_elements_in_data_s2_arr / numThreads;
+
+    for (int t = 0; t < numThreads; ++t) {
+        threadData[t].s1 = s1;
+        threadData[t].get_s2 = get_s2;
+        threadData[t].data_s2_arr = data_s2_arr;
+        threadData[t].get_next_element_arr =
+            get_next_element_arr;
+        threadData[t].work_vals =
+            work_vals;
+
+        threadData[t].startIndex =
+            t * elementsPerThread;
+
+        threadData[t].endIndex =
+            t == numThreads - 1 ? size_elements_in_data_s2_arr : ((t + 1) * elementsPerThread);
+
+        pthread_create(&threads[t], NULL, threadFunction, &threadData[t]);
+    }
+
+    for (int t = 0; t < numThreads; ++t)
+       pthread_join(threads[t], NULL);
+}
+
 
 typedef struct Example_struct_complex_data {
     char* string;
