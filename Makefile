@@ -3,7 +3,7 @@ CFLAGS			  = -Wall
 CFLAGS_EXAMPLES	  = -I . Levenshtein_c.o
 
 PATH_EXAMPLES	  = examples
-TESTS 			  = code 
+TESTS 			  = code code1
 EXTENSION		  = exe
 
 examples: Levenshtein_c.o $(addprefix $(PATH_EXAMPLES)/, $(addsuffix .$(EXTENSION), $(TESTS)))
