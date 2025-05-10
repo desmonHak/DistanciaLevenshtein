@@ -18,6 +18,7 @@
 #define Min(x,y) ((x)<(y) ? (x) : (y))
 #define Min3(x,y,z) Min(Min((x),(y)),(z))
 
+int LevenshteinUnicode(const wchar_t *str1, const wchar_t *str2, int caseSensitive);
 int Levenshtein(const char *str1, const char *str2, int caseSensitive);
 float getAfinidad(
     size_t sizeof_str1,

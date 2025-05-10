@@ -1,3 +1,5 @@
+#include "Levenshtein_c.h"
+
 #include <wchar.h>
 #include <wctype.h>
 #include <stdlib.h>
