@@ -164,7 +164,7 @@ void CallArr(
     size_t size_elements_in_data_s2_arr,            // numero de elementos de un array
     void (*work_vals)(int, float, void*)            // int distancia, float afinidad, void*element
 ) {
-    for (int i = 0; i < size_elements_in_data_s2_arr; i++) {
+    for (size_t i = 0; i < size_elements_in_data_s2_arr; i++) {
         void* element = get_next_element_arr(data_s2_arr, i);
 
         // obtener los datos del puntero data_s2 como el usuario quiera
@@ -186,14 +186,14 @@ void CallArrUnicode(
     size_t size_elements_in_data_s2_arr,            // numero de elementos de un array
     void (*work_vals)(int, float, void*)            // int distancia, float afinidad, void*element
 ) {
-    for (int i = 0; i < size_elements_in_data_s2_arr; i++) {
+    for (size_t i = 0; i < size_elements_in_data_s2_arr; i++) {
         void* element = get_next_element_arr(data_s2_arr, i);
 
         // obtener los datos del puntero data_s2 como el usuario quiera
-        wchar_t *s2 = get_s2(element);
+        const wchar_t *s2 = get_s2(element);
         int distancia = LevenshteinUnicode(s1, s2, 0);
         work_vals(
-            distancia, getAfinidad(strlen(s1), strlen(s2), distancia),
+            distancia, getAfinidad(wcslen(s1), wcslen(s2), distancia),
             element
         );
         
