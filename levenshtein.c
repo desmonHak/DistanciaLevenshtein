@@ -35,8 +35,8 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
     const char *processedStr2 = str2;
 
     if (!caseSensitive) {
-        char *lowerStr1 = (char *)malloc(len1 + 1);
-        char *lowerStr2 = (char *)malloc(len2 + 1);
+        char *lowerStr1 = (char *)calloc(len1 + 1, sizeof(char));
+        char *lowerStr2 = (char *)calloc(len2 + 1, sizeof(char));
 
         for (size_t i = 0; i < len1; ++i) lowerStr1[i] = tolower(str1[i]);
         lowerStr1[len1] = '\0';
@@ -48,7 +48,7 @@ int Levenshtein(const char *str1, const char *str2, int caseSensitive) {
     }
 
     // Usamos un solo array para almacenar los costos actuales y anteriores
-    int *currentRow = (int *)malloc((len1 + 1) * sizeof(int));
+    int *currentRow = (int *)calloc((len1 + 1), sizeof(int));
 
     // Inicializamos la primera fila (costos para transformar una cadena vacía)
     for (size_t i = 0; i <= len1; ++i) {
